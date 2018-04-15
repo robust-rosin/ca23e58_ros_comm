@@ -38,6 +38,11 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 
+namespace rosin_robust
+{
+int flag_value();
+} // namespace rosin_robust
+
 namespace ros
 {
 
@@ -131,6 +136,9 @@ public:
 
   void incrementSequence(const std::string &_topic);
   bool isLatched(const std::string& topic);
+
+  // [ROSIN ROBUST] flag added specifically for testing purposes
+  int rosin_robust_flag_;
 
 private:
   /** if it finds a pre-existing subscription to the same topic and of the

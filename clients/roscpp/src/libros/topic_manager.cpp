@@ -50,6 +50,28 @@ using namespace std; // sigh
 
 /// \todo Locking can be significantly simplified here once the Node API goes away.
 
+#define ROSIN_ROBUST_FLAG_VALUE 42
+
+namespace rosin_robust
+{
+// These variables serve the purpose of forcing wait/sleep at specific points,
+// which is as close as we can get to a pre-determined
+// thread scheduling during testing.
+boost::mutex entry_mutex;
+boost::condition_variable thread_blocker;
+bool thread_wait = true;
+boost::thread_specific_ptr<boost::mutex::scoped_lock> thread_lock;
+
+int flag_value()
+{
+  int val = ros::TopicManager::instance()->rosin_robust_flag_;
+  boost::mutex::scoped_lock entry_lock(entry_mutex);
+  thread_wait = false;
+  thread_blocker.notify_all();
+  return val;
+}
+} // namespace rosin_robust
+
 namespace ros
 {
 
@@ -57,12 +79,18 @@ TopicManagerPtr g_topic_manager;
 boost::mutex g_topic_manager_mutex;
 const TopicManagerPtr& TopicManager::instance()
 {
+  boost::mutex::scoped_lock entry_lock(rosin_robust::entry_mutex);
   if (!g_topic_manager)
   {
     boost::mutex::scoped_lock lock(g_topic_manager_mutex);
     if (!g_topic_manager)
     {
-      g_topic_manager = boost::make_shared<TopicManager>();
+      TopicManager *tmp =
+            (TopicManager *) operator new(sizeof(TopicManager));    // Step 1
+      g_topic_manager = boost::shared_ptr<TopicManager>(tmp);       // Step 3
+      while (rosin_robust::thread_wait)                         // interleaving
+        rosin_robust::thread_blocker.wait(entry_lock);
+      new (tmp) TopicManager;                                       // Step 2
     }
   }
 
@@ -70,7 +98,7 @@ const TopicManagerPtr& TopicManager::instance()
 }
 
 TopicManager::TopicManager()
-: shutting_down_(false)
+: rosin_robust_flag_(ROSIN_ROBUST_FLAG_VALUE), shutting_down_(false)
 {
 }
 

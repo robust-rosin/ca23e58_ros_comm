@@ -145,3 +145,10 @@ catkin_install_python(PROGRAMS
   rosbuild/scripts/gensrv_cpp.py
   rosbuild/scripts/msg_gen.py
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/rosbuild/scripts)
+
+
+if(CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  add_rostest_gtest(test_ca23e58 test/test_ca23e58.launch test/test_ca23e58.cpp)
+  target_link_libraries(test_ca23e58 roscpp ${catkin_LIBRARIES})
+endif()

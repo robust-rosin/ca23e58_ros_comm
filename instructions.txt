@@ -1,0 +1,70 @@
+plan to test bug ca23e58 (double-checked locking)
+issue: https://github.com/ros/ros_comm/issues/770
+branch: lunar-devel
+
+paper on DCLP:
+http://www.aristeia.com/Papers/DDJ_Jul_Aug_2004_revised.pdf
+
+fixing commit:
+    aaaf3e9d381ef9e6bb71d25af8a77cef621e4b3a
+parent commit (buggy, this is where development should take place):
+    c0bdb089ccf04d11e48613336381cebca91edbad
+
+buggy code:
+    const TopicManagerPtr& TopicManager::instance()
+    {
+      if (!g_topic_manager)
+      {
+        boost::mutex::scoped_lock lock(g_topic_manager_mutex);
+        if (!g_topic_manager)
+        {
+          g_topic_manager = boost::make_shared<TopicManager>();
+        }
+      }
+
+      return g_topic_manager;
+    }
+
+Since pre-patch it is compiled under C++03, it may be best to use boost mutexes and wait conditions to simulate the breakpoints.
+
+Initialization statement broken down into the three fundamental steps.
+
+Singleton* Singleton::instance() {
+    if (pInstance == 0) {
+        Lock lock;
+        if (pInstance == 0) {
+            pInstance =                             // Step 3
+                operator new(sizeof(Singleton));    // Step 1
+            new (pInstance) Singleton;              // Step 2
+        }
+    }
+    return pInstance;
+}
+
+TopicManagerPtr is a boost::shared_ptr<TopicManager>, so we need to create it too.
+Something along the lines of:
+    TopicManager *tmp = new ...             // step 1
+    g_topic_manager = TopicManagerPtr(tmp); // step 3
+
+Strategy:
+1. Add a field to TopicManager with some flag
+2. Constructor assigns flag to a specific value (e.g. 42)
+3. Thread 1 blocks after step 3, but before step 2
+4. Thread 2 sees pointer != null and falls through outer if
+5. Add an assert before the return: flag == VALUE
+
+In the buggy version, this is most likely going to result in an error.
+The allocated memory will hold whatever garbage was in memory,
+which is most likely not the selected value.
+In the fixed version, there is no way to insert a break between steps 3 and 2,
+so the constructed object will always have the flag set to the correct value
+before the return statement.
+
+
+Notes (possibly unnecessary):
+1. NodeHandle constructor calls NodeHandle::construct (node_handle.cpp)
+2. The first NodeHandle::construct calls ros::start (init.cpp)
+3. ros::start calls TopicManager::instance and TopicManager::start
+4. TopicManager::instance (bugged) calls TopicManager constructor
+5. TopicManager::start initializes the fields with proper values
+6. (ros::start is called once) implies (TopicManager::start is called once)
