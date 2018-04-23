@@ -1,0 +1,3 @@
+<launch>
+    <test test-name="bug_witness" pkg="roscpp" type="bug_witness" />
+</launch>
