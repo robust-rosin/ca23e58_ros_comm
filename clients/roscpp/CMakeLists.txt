@@ -149,6 +149,6 @@ catkin_install_python(PROGRAMS
 
 if(CATKIN_ENABLE_TESTING)
   find_package(rostest REQUIRED)
-  add_rostest_gtest(test_ca23e58 test/test_ca23e58.launch test/test_ca23e58.cpp)
-  target_link_libraries(test_ca23e58 roscpp ${catkin_LIBRARIES})
+  add_rostest_gtest(bug_witness test/bug_witness.test test/bug_witness.cpp)
+  target_link_libraries(bug_witness roscpp ${catkin_LIBRARIES})
 endif()

@@ -1,3 +1,0 @@
-<launch>
-    <test test-name="test_ca23e58" pkg="roscpp" type="test_ca23e58" />
-</launch>
